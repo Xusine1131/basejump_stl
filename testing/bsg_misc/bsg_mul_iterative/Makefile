@@ -12,8 +12,9 @@ simv:
 	$(BSG_RTL_SRC_DIR)/bsg_defines.v \
 	$(BSG_TEST_SRC_DIR)/bsg_nonsynth_clock_gen.v \
 	$(BSG_TEST_SRC_DIR)/bsg_nonsynth_reset_gen.v \
-	$(BSG_RTL_SRC_DIR)/bsg_adder_carry_save_4_2.v \
 	$(BSG_RTL_SRC_DIR)/bsg_adder_carry_save.v \
+	$(BSG_RTL_SRC_DIR)/bsg_adder_carry_save_4_2.v \
+	$(BSG_RTL_SRC_DIR)/bsg_adder_wallace_tree/*.v \
 	$(BSG_RTL_SRC_DIR)/bsg_adder_wallace_tree.v \
 	$(BSG_RTL_SRC_DIR)/bsg_mul_iterative.v \
 	./test_bsg.v 

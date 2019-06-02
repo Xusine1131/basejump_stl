@@ -37,8 +37,7 @@ module bsg_mul_iterative #(
   ,parameter integer iter_step_p = "inv"
   ,parameter integer full_sized_p = 1
   ,localparam integer output_size_lp = full_sized_p ? 2 * width_p : width_p
-)
-(
+)(
   input clk_i
   ,input reset_i
   // handshake signal
@@ -240,11 +239,10 @@ module bsg_mul_iterative #(
     // A full-sized wallace tree.
     bsg_adder_wallace_tree #(
       .width_p(csa_output_size_lp)
-      ,.iter_step_p(iter_step_p)
-      ,.max_out_size_lp(csa_output_size_lp)
+      ,.capacity_p(iter_step_p)
     )
     tree(
-      .op_i(ops)
+      .ops_i(ops)
       ,.resA_o(res_A_li)
       ,.resB_o(res_B_li)
     );

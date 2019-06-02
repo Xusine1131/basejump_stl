@@ -22,7 +22,7 @@ wire [`WIDTH_P*2-1:0] right_result = {opA_li_ext,opA_li} * {opB_li_ext,opB_li};
 
 bsg_mul_iterative #(
   .width_p(`WIDTH_P)
-  ,.iter_step_p(4)
+  ,.iter_step_p(8)
 )mul(
   .clk_i(clk_li)
   ,.reset_i(rst_li)
