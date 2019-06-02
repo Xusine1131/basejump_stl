@@ -163,11 +163,11 @@ module bsg_mul_iterative #(
   logic [csa_output_size_lp:0] csa_sum;    // sum of last CSA
   logic [csa_output_size_lp:0] csa_carry;  // carry of last CSA
 
-  // CPA result remnant in last addition, which should be added in next turn.
-
   // Bits of result which can be determined in this turn are sent to CPA.
   reg [iter_step_p-1:0] csa_sum_lowpart;
   reg [iter_step_p-1:0] csa_carry_lowpart; 
+  wire [iter_step_p:0] cpa_lowpart = csa_sum_lowpart + csa_carry_lowpart;
+
   always_ff @(posedge clk_i) begin
     if(reset_internal) begin
       csa_sum_lowpart <= '0;
@@ -175,7 +175,7 @@ module bsg_mul_iterative #(
     end
     else if(current_state_r == eCAL) begin
       csa_sum_lowpart <= csa_sum[iter_step_p-1:0];
-      csa_carry_lowpart <= {csa_carry[iter_step_p-1:1],cpa_opt[iter_step_p] & (cal_state_counter_r != '0)};
+      csa_carry_lowpart <= {csa_carry[iter_step_p-1:1],cpa_lowpart[iter_step_p]};
     end
   end
 
@@ -190,28 +190,14 @@ module bsg_mul_iterative #(
 
   // Determine cpa operands.
   always_comb begin
-    unique case(current_state_r) 
-      eIDLE: begin
-        cpa_opA = '0;
-        cpa_opB = '0;
-      end
-      eCAL : begin 
-        cpa_opA = cal_state_counter_r == '0 ? opA_r & ({actual_width_lp{opB_neg_r}}) : csa_sum_lowpart;
-        cpa_opB = cal_state_counter_r == '0 ? opB_r & ({actual_width_lp{opA_neg_r}}) : csa_carry_lowpart;
-      end
-      eADJ: begin
-        cpa_opA = csa_sum_lowpart;
-        cpa_opB = csa_carry_lowpart;
-      end
-      eCPA: begin
-        cpa_opA = result_remnant_sum_r;
-        cpa_opB = result_remnant_carry_r;
-      end
-      default: begin
-        cpa_opA = '0;
-        cpa_opB = '0;
-      end
-    endcase
+    if(current_state_r == eCAL) begin
+      cpa_opA =  opA_r & ({actual_width_lp{opB_neg_r}});
+      cpa_opB =  opB_r & ({actual_width_lp{opA_neg_r}});
+    end
+    else begin
+      cpa_opA = result_remnant_sum_r;
+      cpa_opB = result_remnant_carry_r;
+    end
   end
 
   if(iter_step_p == 1) begin: NO_CSA
@@ -224,7 +210,7 @@ module bsg_mul_iterative #(
       ,.res_o(csa_sum)
       ,.car_o(csa_carry[actual_width_lp:1])
     );
-    assign csa_carry[0] = cpa_opt[iter_step_p];
+    assign csa_carry[0] = cpa_lowpart[iter_step_p];
     assign wallace_tree_opt_1 = '0;
     assign wallace_tree_opt_2 = '0;
   end //NO_CSA
@@ -294,14 +280,14 @@ module bsg_mul_iterative #(
       else begin
           unique case(current_state_r) 
             eCAL: begin
-              result_low_r <= {cpa_opt[iter_step_p-1:0],result_low_r[actual_width_lp-1:iter_step_p]};
+              result_low_r <= {cpa_lowpart[iter_step_p-1:0],result_low_r[actual_width_lp-1:iter_step_p]};
               result_remnant_sum_r <= csa_sum[csa_output_size_lp-1:iter_step_p];
               result_remnant_carry_r <= csa_carry[csa_output_size_lp-1:iter_step_p];
             end
             eADJ:begin
-              result_low_r <= {cpa_opt[iter_step_p-1:0],result_low_r[actual_width_lp-1:iter_step_p]};
+              result_low_r <= {cpa_lowpart[iter_step_p-1:0],result_low_r[actual_width_lp-1:iter_step_p]};
               result_remnant_sum_r <= csa_sum[actual_width_lp-1:0];
-              result_remnant_carry_r <= {csa_carry[actual_width_lp-1:1], cpa_opt[iter_step_p]};
+              result_remnant_carry_r <= {csa_carry[actual_width_lp-1:1], cpa_lowpart[iter_step_p]};
             end
             eCPA: begin
               result_remnant_sum_r <= cpa_opt;
@@ -327,9 +313,9 @@ module bsg_mul_iterative #(
               result_remnant_carry_r <= csa_carry[csa_output_size_lp-1:iter_step_p];
             end
             eADJ:begin
-              result_low_r <= cpa_opt[iter_step_p-1:0];
+              result_low_r <= cpa_lowpart[iter_step_p-1:0];
               result_remnant_sum_r <= csa_sum[actual_width_lp-1:0];
-              result_remnant_carry_r <= {csa_carry[actual_width_lp-1:1], cpa_opt[iter_step_p]};
+              result_remnant_carry_r <= {csa_carry[actual_width_lp-1:1], cpa_lowpart[iter_step_p]};
             end
             eCPA: begin
               result_remnant_sum_r <= cpa_opt;
