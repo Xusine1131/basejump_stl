@@ -24,8 +24,8 @@ module bsg_fpu_decoder #(
   ,output logic denormal_o
   ,output logic sign_o
 
-  ,output logic [e_p:0] exp_o
-  ,output logic [m_p-1:0] man_o
+  ,output logic [e_p:0] exp_o 
+  ,output logic [m_p:0] man_o // 1.XXXXXXXXX
 );
 
   wire [e_p-1:0] exp = a_i[e_p+m_p-1-:e_p];
@@ -41,7 +41,7 @@ module bsg_fpu_decoder #(
   assign denormal_o = exp_zero & !man_zero;
   assign infty_o = exp_one & man_zero;
   assign nan_o = exp_one & !man_zero;
-  assign sig_nan_o = nan_o & ~man_o[m_p-1];
+  assign sig_nan_o = nan_o & ~man[m_p-1];
   
   // Second, generate the normalized value.
   // generate leading zero
@@ -54,16 +54,15 @@ module bsg_fpu_decoder #(
   );
   assign leading_zeros_number[extended_exp_lp-1:`BSG_SAFE_CLOG2(m_p)] = '0;
   // shifted by leading zero
-  wire [m_p-1:0] normalized_m = man_o << leading_zeros_number;
+  wire [m_p-1:0] normalized_m = man << leading_zeros_number;
   // exponent of the normalized value is -leading_zeros_number.
   // for instance, 0.0001011 * 2^(-126)
   // after shifted by leading zero, the value is 1.011 * 2^(-130), leading_zeros_number = 3, exp is regarded as -3
   wire [extended_exp_lp-1:0] shifted_exp = - leading_zeros_number;
-  wire [m_p-1:0] shifted_mantissa = {1'b0, normalized_m[m_p-2:0]};
+  wire [m_p:0] shifted_mantissa = {normalized_m,1'b0};
 
   // Third, select the correct result.
   assign exp_o = denormal_o ? shifted_exp : {(extended_exp_lp-e_p)'(0), exp};
-  assign man_o = denormal_o ? shifted_mantissa : man;
-
+  assign man_o = denormal_o ? shifted_mantissa : {1'b1,man};
 
 endmodule
