@@ -1,0 +1,178 @@
+#! /usr/bin/python3
+# bsg_multiplier_compressor_generator.py
+# sqlin16@fudan.edu.cn 10/03/2019
+# This file generate wallace-tree-like compressor for multipliers to gather the psum.
+
+import argparse
+
+parser = argparse.ArgumentParser(description='A script for generating radix-4 booth multiplier partial sum compressor.')
+parser.add_argument("width_p", type=int, help="width of radix-4 booth multiplier")
+parser.add_argument("stride_p", type=int, help="iterative stride of radix-4 booth multiplier")
+parser.add_argument("radix_p", type=int, help="radix")
+
+args = parser.parse_args()
+width_p = args.width_p
+stride_p = args.stride_p
+radix_p = args.radix_p
+
+csa_template = '''bsg_adder_carry_save#(
+  .width_p({})
+) {} (
+  .opA_i({})
+  ,.opB_i({})
+  ,.opC_i({})
+  ,.res_o({})
+  ,.car_o({})
+);
+'''
+
+def getElement(width_p: int, stride_p: int, reducing_bit=2):
+    psum = []
+    # generate ports from base_i
+    # base_i_length = width_p+ 1 + 3
+    base_i_length = width_p+ reducing_bit * 2
+    ps_length = width_p + reducing_bit * 2 - 1
+    for i in range(2):
+        ports = []
+        for j in range(base_i_length):
+            ports.append("base_i[{}][{}]".format(i,j))
+        psum.append(ports)
+    # generate ports from psum_i
+    for i in range(stride_p//reducing_bit):
+        ports = []
+        for j in range(ps_length):
+            ports.append("psum_i[{}][{}]".format(i, j))
+        psum.append(ports)
+    res = [[] for i in range(min(2*width_p, base_i_length + stride_p))]
+    for i in range(stride_p//reducing_bit + 2):
+        # first two rows are accumulation registers
+        if i == 0 or i == 1:
+            for k, v in enumerate(psum[i]):
+                res[k].append(v)
+        else:
+            base = reducing_bit*(i-1)
+            for j in range(base, min(base+ps_length, 2*width_p)):
+                res[j].append(psum[i][j - base])
+            res[base-reducing_bit].append("sign_modification_i[{}]".format(i-2))
+            
+    return res
+
+csa_template = '''bsg_adder_carry_save#(
+  .width_p({})
+) {} (
+  .opA_i({})
+  ,.opB_i({})
+  ,.opC_i({})
+  ,.res_o({})
+  ,.car_o({})
+);
+'''
+
+def put_csa(width_p:str, opA: str, opB: str, opC: str, name: str) -> (list, str, str):
+    res_o = "{}_res_o".format(name)
+    car_o = "{}_car_o".format(name)
+    return (csa_template.format(width_p, name, opA, opB, opC, res_o, car_o).rjust(2), res_o, car_o)
+
+
+def reduction(res, start_level: int) -> (list, list, dict):
+    all_modules = []
+    all_wire = []
+    level = 0
+    # print("before iter: ", list(map(lambda x: len(x),res)))
+    while True:
+        cnt = 0
+        carry = [[] for i in range(len(res))]
+        for k, ports in enumerate(res):
+            generate_result = []
+            tmp_ports = ports.copy()
+            while (len(tmp_ports) >= 2 and level > start_level) or len(tmp_ports) >= 3:
+                # assign a csa
+                if len(tmp_ports) >= 3:
+                    modules, res_o, car_o = put_csa(1, tmp_ports[0], tmp_ports[1], tmp_ports[2],"csa_{}_{}".format(level, cnt))
+                    tmp_ports = tmp_ports[3:]
+                elif level != 0 and len(tmp_ports) >= 2:
+                    modules, res_o, car_o = put_csa(1, tmp_ports[0], tmp_ports[1], "1'b0", "csa_{}_{}".format(level, cnt))
+                    tmp_ports = tmp_ports[2:]
+                cnt += 1
+                generate_result.append(res_o)
+                carry[k].append(car_o)
+                
+                all_wire.append(res_o)
+                all_wire.append(car_o)
+                all_modules.append(modules)
+            tmp_ports.extend(generate_result)
+            res[k] = tmp_ports
+        # merge carry into res
+        for k in range(len(res)):
+            if k != 0:
+                res[k].extend(carry[k-1])
+        # print information
+        # print("after iter {}:".format(level), list(map(lambda x: len(x),res)))
+        level += 1
+        # check whether we need to continue
+        is_break = True
+        for ports in res:
+            if len(ports) >= 3:
+                is_break = False
+                break
+        if is_break:
+            # generate binding wire
+            binding = {}
+            for k, ports in enumerate(res):
+                if len(ports) > 0:
+                    binding["outA_o[{}]".format(k)] = ports[0]
+                    if len(ports) > 1:
+                        binding["outB_o[{}]".format(k)] = ports[1]
+                    else:
+                        binding["outB_o[{}]".format(k)] = "'0"
+                else:
+                    binding["outA_o[{}]".format(k)] = "'0"
+                    binding["outB_o[{}]".format(k)] = "'0"
+                    
+            return (all_modules, all_wire, binding)
+
+
+output_size = min(stride_p+2*radix_p+width_p-1, 2*width_p-1)
+
+with open("./bsg_multiplier_compressor_{}_{}_{}.v".format(width_p, stride_p, radix_p), "w") as f:
+    f.write("// This file is generated by bsg_multiplier_compressor_generator.py {} {} {}. Do not modify.\n".format(width_p, stride_p, radix_p))
+    # write module head
+    f.write("module bsg_multiplier_compressor_{}_{}\n".format(width_p, stride_p))
+    f.write("(\n")
+    f.write("  input [1:0][{}:0] base_i\n".format(width_p + 2*radix_p-1))
+    f.write("  ,input [{}:0][{}:0] psum_i\n".format(stride_p//radix_p-1, width_p + 2*radix_p-2))
+    f.write("  ,input [{}:0] sign_modification_i\n".format(stride_p//radix_p-1))
+    f.write("  ,output [{}:0] outA_o\n".format(output_size))
+    f.write("  ,output [{}:0] outB_o\n".format(output_size))
+    f.write(");\n")
+
+    ele = getElement(width_p, stride_p, radix_p)
+    # start iteration
+    start_level = 0
+    mod, all_wire, binding = reduction(ele.copy(), start_level)
+    while True:
+        print("Turn {}: {} CSAs.".format(start_level, len(mod)))
+        start_level += 1
+        new_mod, new_all_wire, new_binding = reduction(ele.copy(), start_level)
+        if len(new_mod) > len(mod):
+            print("Iteration Stop.")
+            break
+        else:
+            mod, all_wire, binding = new_mod, new_all_wire, new_binding
+    print("Final CSA Number: {}".format(len(mod)))
+    # dump wires
+    for w in all_wire:
+        f.write("wire {};\n".format(w))
+
+    # dump module
+    f.writelines(mod)
+
+    f.write("\n")
+
+    # bind I/O ports
+
+    for k, v in binding.items():
+        f.write("assign {} = {};\n".format(k, v))
+
+
+    f.write("endmodule\n")
