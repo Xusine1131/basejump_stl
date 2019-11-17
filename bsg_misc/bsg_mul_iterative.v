@@ -62,7 +62,7 @@ endmodule
 module bsg_mul_booth_compressor #(
   parameter integer width_p = 64
   ,parameter integer stride_p = 32
-  ,localparam integer output_size_lp = `BSG_MAX(2*width_p, width_p+stride_p+8)
+  ,localparam integer output_size_lp = `BSG_MIN(2*width_p, width_p+stride_p+8)
 )(
   // multiplicand
   input  [width_p-1:0] mul_x1_i
@@ -297,7 +297,7 @@ module bsg_mul_iterative #(
     ,.o(csa_opA_init)
   );
 
-  localparam csa_tree_width_lp = `BSG_MAX(csa_reg_width_lp, 2*width_p);
+  localparam csa_tree_width_lp = `BSG_MIN(csa_reg_width_lp, 2*width_p);
 
   wire [csa_tree_width_lp-1:0] aggregation_outA;
   wire [csa_tree_width_lp-1:0] aggregation_outB;
