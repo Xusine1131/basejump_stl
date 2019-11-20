@@ -30,6 +30,8 @@ async def random_test(dut):
     dut.clk_i = 0
     await Timer(1, units="ns")
 
+    error_type = set()
+
     # Random Test
     for _ in range(1000):
 
@@ -79,8 +81,11 @@ async def random_test(dut):
             print(opB)
             print(opA * opB)
             dut._log.error("Mismatched result!")
-            return
+            error_type.add(int(dut.opB_n[0]))
+            #return 1
 
+
+    print(error_type)
 
     dut.signed_i = 1
     await Timer(1, units="ns")

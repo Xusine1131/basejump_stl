@@ -15,7 +15,6 @@ module bsg_booth_encoder(
   assign o[3] = (i == '0) || (i == '1) ? '0 : i[3]; 
 endmodule
 
-/*
 module bsg_booth_selector_first #(
   parameter integer width_p = 64
 )(
@@ -40,16 +39,21 @@ wire [width_p+1:0] sel_res_B = B_res;
 wire [width_p+1:0] selA_res_inv = sel_i[3] ? ~sel_res_A : sel_res_A;
 wire [width_p+1:0] selB_res_inv = sel_i[3] ? ~sel_res_B : sel_res_B;
 
-wire e = mul_signed_i ? ~sel_i[3] ^ ;
-wire q = mul_signed_i | sel_i[3];
+wire eA = (mul_signed_i && (sel_i[2:1] != '0)) ^ sel_i[3];
+wire eB = (mul_signed_i && (sel_i[0] != '0)) ^ sel_i[3];
 
-assign A_o = {~q, q, q, mul_signed_i, selA_res_inv};
-assign B_o = {3'b0, selB_res_inv};
+//wire [3:0] ext = {~e, e, e, e} - (sel_i[0] == 0 && sel_i[3]) - (sel_i[2:1] == '0 && sel_i[3]);
+// eA = 0 : 1000 - 1 = 0111
+// eA = 1 : 0111 - 1 = 0110
+
+assign A_o = {3'b011, ~eA, selA_res_inv};
+assign B_o = {3'b000, ~eB, selB_res_inv};
+
 
 endmodule
-*/
 
-module bsg_booth_selector_first #(
+
+module bsg_booth_selector_first_target #(
   parameter integer width_p = 64
 )(
   // multiplicand
@@ -77,7 +81,7 @@ endcase
 wire [width_p+1:0] sel_res_inv = sel_i[3] ? ~sel_res : sel_res;
 // Determine e
 // wire e = mul_signed_i ^ sel_i[3];
-wire e = mul_signed_i ? sel_i[3] ^ sel_res[width_p+1] : sel_i[3];
+wire e = (mul_signed_i && (sel_i[2:0] != '0)) ^ sel_i[3];
 // Determine o
 assign o = {~e, e, e, e, sel_res_inv};
 endmodule
@@ -111,7 +115,7 @@ wire [width_p+1:0] sel_res_inv = sel_i[3] ? ~sel_res : sel_res;
 // Determine e
 // wire e = mul_signed_i ^ sel_i[3];
 // 0, 1011, 0011
-wire e = mul_signed_i ? sel_i[3] ^ sel_res[width_p+1] : sel_i[3];
+wire e = (mul_signed_i && (sel_i[2:0] != '0)) ^ sel_i[3];
 // Determine o
 assign o = {2'b11,~e, sel_res_inv};
 endmodule
@@ -167,8 +171,8 @@ assign base_reg[1] = csaB_i;
 
 bsg_multiplier_compressor_64_33 cps (
   .base_i(base_reg)
-  //,.base_sign_i(sign_cor_first_i)
-  ,.base_sign_i(1'b0)
+  ,.base_sign_i(sign_cor_first_i)
+  //,.base_sign_i(1'b0)
   ,.psum_i(partial_product_lo)
   ,.sign_modification_i(sign_correction)
   ,.outA_o(A_o)
@@ -301,7 +305,7 @@ module bsg_mul_iterative #(
     end
     else if(state_r == eIdle && v_i) begin
       opB_r <= opB_n[booth_recording_length_lp-1:1];
-      partial_sign_correction_r <= opB_n[0][3];
+      partial_sign_correction_r <=  opB_n[0][3];
       first_partial_sign_correction_r <= opB_n[0][3];
     end
     else if(state_r == eCal) begin
@@ -324,8 +328,11 @@ module bsg_mul_iterative #(
   wire [csa_reg_width_lp-1:0] csa_opB_n;
 
   wire [width_p+5:0] csa_opA_init;
-  wire [width_p+5:0] csa_opB_init = '0;
-  /*
+  wire [width_p+5:0] csa_opB_init;
+
+  wire [width_p+5:0] csa_init = csa_opA_init + csa_opB_init + {opB_n[0][3],1'b0};
+  wire [width_p+5:0] csa_init_expected;
+  
   
   bsg_booth_selector_first #(
     .width_p(width_p)
@@ -337,21 +344,18 @@ module bsg_mul_iterative #(
     ,.B_o(csa_opB_init)
   );
   
-  */
-
-  ///*
   wire [width_p+1:0] mul_x3;
-  bsg_booth_selector_first #(
+  bsg_booth_selector_first_target #(
     .width_p(width_p)
-    ) first_selector (
+  ) first_selector_expected (
     .mul_x1_i(opA_x1_r)
     ,.mul_x3_i(mul_x3)
     ,.mul_signed_i(opA_signed_r)
 
     ,.sel_i(opB_n[0])
-    ,.o(csa_opA_init)
+    ,.o(csa_init_expected)
   );
-  //*/
+  
 
   localparam csa_tree_width_lp = `BSG_MIN(csa_reg_width_lp, 2*width_p);
 
