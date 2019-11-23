@@ -1,8 +1,8 @@
 // -------------------------------------------------------
 // -- bsg_mul_iterative.v
 // -------------------------------------------------------
-// A radix-16 64-bit iterative booth multiplier.
-// For the sake of PPA, only stride_p = 32 is supported, but you can use bsg_multiplier_compressor_generator.py  
+// A radix-8 64-bit iterative booth multiplier.
+// For the sake of PPA, only stride_p = 33 is supported, but you can use bsg_multiplier_compressor_generator.py  
 // to generate the appropriate compressor you need.
 // -------------------------------------------------------
 
