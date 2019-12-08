@@ -52,40 +52,6 @@ assign B_o = {3'b000, ~eB, selB_res_inv};
 
 endmodule
 
-
-module bsg_booth_selector_first_target #(
-  parameter integer width_p = 64
-)(
-  // multiplicand
-   input [width_p-1:0] mul_x1_i
-  ,input [width_p+1:0] mul_x3_i
-  ,input mul_signed_i // 1 indicate mul is negative
-
-  // Select bit
-  ,input [3:0] sel_i
-
-  ,output [width_p+5:0] o // width+5
-);
-
-// select the basic result
-logic [width_p+1:0] sel_res; // width + 2 
-always_comb unique casez(sel_i[1:0])
-  3'b000: sel_res = '0;
-  3'b001: sel_res = {mul_signed_i, mul_signed_i, mul_x1_i};
-  3'b010: sel_res = {mul_signed_i, mul_x1_i, 1'b0};
-  3'b011: sel_res = mul_x3_i;
-  default: sel_res = '0;
-endcase
-// Modify
-wire [width_p+1:0] sel_res_4 = sel_i[2] ? {mul_x1_i, 2'b0} : sel_res;
-wire [width_p+1:0] sel_res_inv = sel_i[3] ? ~sel_res_4 : sel_res_4;
-// Determine e
-// wire e = mul_signed_i ^ sel_i[3];
-wire e = (mul_signed_i && (sel_i[2:0] != '0)) ^ sel_i[3];
-// Determine o
-assign o = {~e, e, e, e, sel_res_inv};
-endmodule
-
 module bsg_booth_selector #(
   parameter integer width_p = 64
 )(
@@ -330,8 +296,6 @@ module bsg_mul_iterative #(
   wire [width_p+5:0] csa_opA_init;
   wire [width_p+5:0] csa_opB_init;
 
-  wire [width_p+5:0] csa_init = csa_opA_init + csa_opB_init + {opB_n[0][3],1'b0};
-  wire [width_p+5:0] csa_init_expected;
   
   
   bsg_booth_selector_first #(
@@ -342,18 +306,6 @@ module bsg_mul_iterative #(
     ,.sel_i(opB_n[0])
     ,.A_o(csa_opA_init)
     ,.B_o(csa_opB_init)
-  );
-  
-  wire [width_p+1:0] mul_x3;
-  bsg_booth_selector_first_target #(
-    .width_p(width_p)
-  ) first_selector_expected (
-    .mul_x1_i(opA_x1_r)
-    ,.mul_x3_i(mul_x3)
-    ,.mul_signed_i(opA_signed_r)
-
-    ,.sel_i(opB_n[0])
-    ,.o(csa_init_expected)
   );
   
 
