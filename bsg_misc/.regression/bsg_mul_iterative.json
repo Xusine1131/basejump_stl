@@ -3,7 +3,7 @@
     "filelist": [ 
         "basejump_stl/bsg_misc/bsg_defines.v",
         "basejump_stl/bsg_misc/bsg_adder_carry_save.v",  
-        "basejump_stl/bsg_misc/bsg_multiplier_compressor/bsg_multiplier_compressor_64_32_3.v", 
+        "basejump_stl/bsg_misc/bsg_multiplier_compressor/bsg_multiplier_compressor_64_33_3.v", 
         "basejump_stl/bsg_misc/bsg_adder_carry_selected.v",
         "basejump_stl/bsg_misc/bsg_mul_iterative.v"
         ],  

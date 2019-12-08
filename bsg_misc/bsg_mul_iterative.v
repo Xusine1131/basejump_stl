@@ -69,16 +69,16 @@ module bsg_booth_selector_first_target #(
 
 // select the basic result
 logic [width_p+1:0] sel_res; // width + 2 
-always_comb unique casez(sel_i[2:0])
+always_comb unique casez(sel_i[1:0])
   3'b000: sel_res = '0;
   3'b001: sel_res = {mul_signed_i, mul_signed_i, mul_x1_i};
   3'b010: sel_res = {mul_signed_i, mul_x1_i, 1'b0};
   3'b011: sel_res = mul_x3_i;
-  3'b1??: sel_res = {mul_x1_i, 2'b0};
   default: sel_res = '0;
 endcase
 // Modify
-wire [width_p+1:0] sel_res_inv = sel_i[3] ? ~sel_res : sel_res;
+wire [width_p+1:0] sel_res_4 = sel_i[2] ? {mul_x1_i, 2'b0} : sel_res;
+wire [width_p+1:0] sel_res_inv = sel_i[3] ? ~sel_res_4 : sel_res_4;
 // Determine e
 // wire e = mul_signed_i ^ sel_i[3];
 wire e = (mul_signed_i && (sel_i[2:0] != '0)) ^ sel_i[3];
